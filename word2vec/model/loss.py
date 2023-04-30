@@ -1,4 +1,5 @@
 import math
+import random
 from collections import Counter, defaultdict
 from time import time
 from typing import Iterable, Dict, Tuple
@@ -8,7 +9,7 @@ import torch
 import torch.nn.functional as F
 import re
 import numpy as np
-
+from sortedcontainers import SortedDict
 
 # fix random seeds for reproducibility
 SEED = 123
@@ -44,7 +45,7 @@ def corpus(rare_words: set = None):
         for word in text.split():
             if not rare_words or word not in rare_words:
                 yield word
-            # Should I yield a rare word token otherwise? Do I mind the next non-rare words being interpreted as closer?
+            # TODO - Should I yield a rare word token otherwise? Do I mind the next non-rare words being interpreted as closer?
 
 
 def zero():
@@ -55,6 +56,7 @@ def word_count():
     """
     Dict mapping word to its count in the corpus.
     """
+    # Using zero instead of a simple lambda because pickle which memory.cache uses fails on lambdas.
     word_count_dict = defaultdict(zero)
 
     g = corpus()
@@ -97,7 +99,7 @@ def pruned_word_count() -> Tuple[Dict[str, int], set]:
 
 
 @memory.cache
-def adjusted_pruned_word_count():  # TODO: rename, and also rename cache dir
+def adjusted_pruned_word_count() -> Dict[str, float]:
     """
     The word count adjusted to the power of 3/4.
     """
@@ -113,7 +115,7 @@ def adjusted_pruned_word_count():  # TODO: rename, and also rename cache dir
 
 
 @memory.cache()
-def word_to_accumulated_probability() -> Tuple[Dict[str, float], float]:
+def word_to_accumulated_probability() -> Tuple[SortedDict[float, str], float]:
     """
     Returns a dictionary mapping a word to it's accumulated probability distribution from 0 to the given output of
     normalizing sum.
@@ -125,27 +127,33 @@ def word_to_accumulated_probability() -> Tuple[Dict[str, float], float]:
 
     accumulated_probability = 0
     for word, value in sorted(adjusted_count.items(), key=lambda x: x[1], reverse=True):
-        word_to_accumulated_probability_dict[word] = accumulated_probability
+        word_to_accumulated_probability_dict[accumulated_probability] = word
         accumulated_probability += value
 
     normalizing_sum = sum(adjusted_count.values())
 
     print(f"normalizing_sum: {normalizing_sum}. accumulated_probability: {accumulated_probability} ")
 
-    return word_to_accumulated_probability_dict, accumulated_probability
-
-t0 = time()
-print(t0)
-a = word_to_accumulated_probability()
-print(f"total time: {time() - t0}. Total words: {len(a)}")
+    return SortedDict(word_to_accumulated_probability_dict), accumulated_probability
 
 
-
-def adjusted_unigram_distribution(corpus: Iterable[str]):
+def adjusted_unigram_distribution(word_to_accumulated_probability_dict, normalizing_sum):
     """
     Produces words according to unigram distribution shifted by the power of 3/4 and normalized.
     """
-    word_to_accumulated_probability_dict, normalizing_sum = word_to_accumulated_probability()
+    rand = random.uniform(0, normalizing_sum)
+    index = word_to_accumulated_probability_dict.bisect(rand)
+    interesting_key = word_to_accumulated_probability_dict.iloc[index - 1]
+    print(f"Index: {index}, {rand}, value before: {word_to_accumulated_probability_dict.iloc[index - 1]} value after: {word_to_accumulated_probability_dict.iloc[index]}")
+    return word_to_accumulated_probability_dict[interesting_key]
+
+
+word_to_accumulated_probability_dict, normalizing_sum = word_to_accumulated_probability()
+t0 = time()
+print(t0)
+for x in range(10000):
+    print(adjusted_unigram_distribution(word_to_accumulated_probability_dict, normalizing_sum))
+print(f"total time: {time() - t0}")
 
 
 def nll_loss(output, target):
