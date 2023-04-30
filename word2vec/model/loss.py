@@ -10,12 +10,6 @@ import re
 import numpy as np
 
 
-RARE_WORD_THRESHOLD = 500
-
-memory = joblib.Memory("cachedir")
-
-t0 = 0
-
 # fix random seeds for reproducibility
 SEED = 123
 torch.manual_seed(SEED)
@@ -23,6 +17,11 @@ torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
 np.random.seed(SEED)
 
+RARE_WORD_THRESHOLD = 100
+
+memory = joblib.Memory("cachedir")
+
+t0 = 0
 
 
 def corpus(rare_words: set = None):
@@ -48,26 +47,38 @@ def corpus(rare_words: set = None):
             # Should I yield a rare word token otherwise? Do I mind the next non-rare words being interpreted as closer?
 
 
-@memory.cache
-def word_count():  # TODO: rename, and also rename cache dir
-    """
-    Dict mapping word to its count in the corpus. Produces Also a list of rare words.
-    """
-    word_count_dict = defaultdict(0)
+def zero():
+    return 0
 
-    for word in corpus():
-        word_count_dict[word] += 1
+@memory.cache
+def word_count():
+    """
+    Dict mapping word to its count in the corpus.
+    """
+    word_count_dict = defaultdict(zero)
+
+    g = corpus()
+
+    try:
+        next_word = next(g)
+        counter = 0
+
+        while True:
+            for i in range(1000000):
+                word_count_dict[next_word] += 1
+
+                next_word = next(g)
+            counter += 1
+            print(f"Counter: {counter}, len: {len(word_count_dict)}")
+    except:
+        print("Excepted :)")
+        pass
 
     return word_count_dict
 
-t0 = time()
-print(t0)
-a = word_count()
-print(f"total time: {time() - t0}. Total words: {len(a)}")
-
 
 @memory.cache
-def pruned_word_count() -> Tuple[Dict[str, int], set]: # TODO: rename, and also rename cache dir
+def pruned_word_count() -> Tuple[Dict[str, int], set]:
     """
     Dict mapping word to its count in the corpus, excluding rare words. Produces Also a set of rare words.
     """
@@ -78,7 +89,7 @@ def pruned_word_count() -> Tuple[Dict[str, int], set]: # TODO: rename, and also 
 
     for word in word_count_dict:
         if word_count_dict[word] > RARE_WORD_THRESHOLD:
-            word_count_without_rare_words[word] = word_count[word]
+            word_count_without_rare_words[word] = word_count_dict[word]
         else:
             rare_words.add(word)
 
@@ -90,7 +101,7 @@ def adjusted_pruned_word_count():  # TODO: rename, and also rename cache dir
     """
     The word count adjusted to the power of 3/4.
     """
-    word_count_without_rare_words = pruned_word_count()
+    word_count_without_rare_words, _ = pruned_word_count()
 
     adjusted_word_count_without_rare_words = dict()
 
@@ -113,9 +124,9 @@ def word_to_accumulated_probability() -> Tuple[Dict[str, float], float]:
     word_to_accumulated_probability_dict = dict()
 
     accumulated_probability = 0
-    for word in adjusted_count:
+    for word, value in sorted(adjusted_count.items(), key=lambda x: x[1], reverse=True):
         word_to_accumulated_probability_dict[word] = accumulated_probability
-        accumulated_probability += adjusted_count[word]
+        accumulated_probability += value
 
     normalizing_sum = sum(adjusted_count.values())
 
@@ -123,13 +134,18 @@ def word_to_accumulated_probability() -> Tuple[Dict[str, float], float]:
 
     return word_to_accumulated_probability_dict, accumulated_probability
 
+t0 = time()
+print(t0)
+a = word_to_accumulated_probability()
+print(f"total time: {time() - t0}. Total words: {len(a)}")
+
+
 
 def adjusted_unigram_distribution(corpus: Iterable[str]):
     """
     Produces words according to unigram distribution shifted by the power of 3/4 and normalized.
     """
     word_to_accumulated_probability_dict, normalizing_sum = word_to_accumulated_probability()
-    # Todo - randomize a number between 0 and the normalizing sum, and bisect through the above dict to find the appropriate word.
 
 
 def nll_loss(output, target):
