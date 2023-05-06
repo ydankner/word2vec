@@ -67,6 +67,7 @@ def word_count():
 
         while True:
             for i in range(1000000):
+                # Inner loop to not spam too much with prints
                 word_count_dict[next_word] += 1
 
                 next_word = next(g)
@@ -148,13 +149,4 @@ def adjusted_unigram_distribution(word_to_accumulated_probability_dict, normaliz
     return word_to_accumulated_probability_dict[interesting_key]
 
 
-word_to_accumulated_probability_dict, normalizing_sum = word_to_accumulated_probability()
-t0 = time()
-print(t0)
-for x in range(10000):
-    print(adjusted_unigram_distribution(word_to_accumulated_probability_dict, normalizing_sum))
-print(f"total time: {time() - t0}")
-
-
-def nll_loss(output, target):
-    return F.nll_loss(output, target)
+print(adjusted_unigram_distribution(*word_to_accumulated_probability()))
