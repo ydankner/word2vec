@@ -35,7 +35,8 @@ class Word2vecModel(BaseModel):
         Given a list of words, selects these indices from the first dimension of the given tensor
         """
         word_indices = torch.tensor([self.word_to_index_dict[word] for word in words])
-        return torch.index_select(word_vectors, 0, word_indices)
+        relevant_word_vectors = torch.index_select(word_vectors, 0, word_indices)
+        return relevant_word_vectors
 
     def products_of_center_and_context(self, word_pairs: Tuple[List[str], List[str]]) -> Tensor:
         """
@@ -62,12 +63,9 @@ class Word2vecModel(BaseModel):
         encountered_pairs_products = self.products_of_center_and_context(word_pairs=encountered_pairs)
         noise_pairs_products = self.products_of_center_and_context(word_pairs=noise_pairs)
 
-        sigmoid_encountered_pairs = Sigmoid([BATCH_SIZE])
-        sigmoid_noise_pairs = Sigmoid([BATCH_SIZE * K_RATIO])
-        encountered_pairs_objective = torch.log(sigmoid_encountered_pairs(encountered_pairs_products)).sum()
-
+        encountered_pairs_objective = torch.log(torch.sigmoid(encountered_pairs_products)).sum()
         # Notice the "-" to negate the noise pairs:
-        noise_pairs_objective = torch.log(sigmoid_noise_pairs(-noise_pairs_products)).sum()
+        noise_pairs_objective = torch.log(torch.sigmoid(-noise_pairs_products)).sum()
 
         objective = encountered_pairs_objective + noise_pairs_objective
         loss = -objective
