@@ -27,7 +27,7 @@ class Word2vecModel(BaseModel):
 
         # Since rand returns a uniform distribution between 0-1, we need to shift it by -0.5 to fit to the initial
         # randomized word vectors:
-        self.word_vectors = word_vectors_unshifted - (ones(word_vector_shape) / 2)
+        self.word_vectors = torch.nn.Parameter(word_vectors_unshifted - (ones(word_vector_shape) / 2))
         self.word_to_index_dict = word_to_index_dict
 
     def select_indices_from_words(self, words: List[str], word_vectors: Tensor) -> Tensor:

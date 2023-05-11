@@ -145,7 +145,7 @@ def adjusted_unigram_distribution(word_to_accumulated_probability_dict, normaliz
     rand = random.uniform(0, normalizing_sum)
     index = word_to_accumulated_probability_dict.bisect(rand)
     interesting_key = word_to_accumulated_probability_dict.iloc[index - 1]
-    print(f"Index: {index}, {rand}, value before: {word_to_accumulated_probability_dict.iloc[index - 1]} value after: {word_to_accumulated_probability_dict.iloc[index]}")
+    #print(f"Index: {index}, {rand}, value before: {word_to_accumulated_probability_dict.iloc[index - 1]} value after: {word_to_accumulated_probability_dict.iloc[index]}")
     return word_to_accumulated_probability_dict[interesting_key]
 
 
